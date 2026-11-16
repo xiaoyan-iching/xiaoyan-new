@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>小衍起卦計算機</title>
+<style>
+body{font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;margin:0;background:#f5f1e8;color:#2d2a26} .wrap{max-width:1100px;margin:auto;padding:24px}.card{background:#fffdf8;border:1px solid #ddd3c4;border-radius:14px;padding:18px;margin:14px 0;box-shadow:0 2px 8px #0000000a} h1,h2{margin:0 0 12px} input,button,select{font:inherit;padding:10px 12px;border:1px solid #cfc4b4;border-radius:9px;background:white}button{cursor:pointer;background:#2d2a26;color:white}.muted{color:#756e65;font-size:14px}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.hidden{display:none!important}.piles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:15px 0}.pile{min-height:120px;border:2px dashed #cfc4b4;border-radius:12px;text-align:center;padding:12px;background:#faf7f0}.pile strong{display:block;font-size:20px;margin-bottom:8px}.pile .count{font-size:28px}.steps{display:grid;grid-template-columns:1fr 1fr;gap:10px}.step{padding:12px;border-radius:10px;background:#f2ede3}.value{font-size:42px;font-weight:700;text-align:center;margin:8px}.linegrid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}.line{border:1px solid #ddd3c4;border-radius:9px;padding:10px;text-align:center;background:#fff}.line b{font-size:24px}.tablewrap{overflow:auto;max-height:520px}table{border-collapse:collapse;width:100%;font-size:14px}th,td{border-bottom:1px solid #e4ddd2;padding:7px 8px;text-align:right;white-space:nowrap}th:first-child,td:first-child{text-align:left}.tabs{display:flex;gap:8px;margin-bottom:10px}.tabs button{background:#eee7dc;color:#2d2a26}.tabs button.active{background:#2d2a26;color:#fff}.notice{padding:10px;border-left:4px solid #8b5e34;background:#f5efe5}.danger{color:#8b2d2d}@media(max-width:700px){.steps{grid-template-columns:1fr}.linegrid{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body><div class="wrap">
+<h1>小衍起卦計算機</h1><p class="muted">64 張牌／固定牌／天・人・地二次取人／六爻逐次生成／</p>
+
+
+<section id="formal">
+<div class="card"><h2>① 先寫問題</h2><label for="facebookId">Facebook ID（必填）</label><input id="facebookId" type="text" required autocomplete="off" placeholder="請輸入 Facebook ID" style="width:100%;box-sizing:border-box;margin:6px 0 10px"><label for="question">問題（必填）</label><textarea id="question" rows="3" required style="width:100%;box-sizing:border-box;border:1px solid #cfc4b4;border-radius:9px;padding:10px" placeholder="請寫下這一卦要觀察的事情"></textarea><div class="row" style="margin-top:10px"><button id="startBtn">開始起卦</button><span id="lockMsg" class="muted"></span></div></div>
+<div id="formalArea" class="card hidden"><h2 id="roundTitle">第 1 爻</h2><div class="notice">固定牌：<b id="fixedCard">—</b>　｜　本輪剩餘牌：63 張</div><div class="piles"><div class="pile"><strong>天</strong><div class="count" id="tian1">—</div></div><div class="pile"><strong>人</strong><div class="count" id="ren1">—</div></div><div class="pile"><strong>地</strong><div class="count" id="di1">—</div></div></div><div class="steps"><div class="step">第一次分牌：<b>天／人／地</b> → 取「人」堆</div><div class="step">第二次分牌：<b>天／人／地</b> → 取「人」堆 → 抽牌</div></div><div class="row" style="margin-top:12px"><button id="nextStepBtn">開始本爻</button><span id="stepMsg" class="muted"></span></div><div class="value" id="drawValue">—</div><div class="linegrid" id="lineGrid"></div><div id="sixDigitResult" class="hidden" style="margin-top:18px"><label for="sixDigits"><b>本次起卦六碼</b></label><div class="row" style="margin-top:6px"><input id="sixDigits" type="text" readonly aria-label="本次起卦六碼" style="flex:1;min-width:180px;font-size:20px;letter-spacing:3px"><button id="copySixDigitsBtn" type="button">複製六碼</button><span id="copySixDigitsStatus" class="muted" aria-live="polite"></span></div></div></div>
+</section>
+
+
+<div class="card"><h2>正式紀錄</h2><div id="records" class="muted">尚無正式紀錄</div></div>
+</div>
+<script>
+const cards=[]; const suits=['萬','餅','索'];
+for(const v of [6,9]) for(const s of ['萬','餅']) for(let i=0;i<4;i++) cards.push({v,s,i});
+for(const v of [1,3,5]) for(const s of ['萬','餅']) for(let i=0;i<4;i++) cards.push({v:7,s,i});
+for(const v of [2,4]) for(const s of ['萬','餅','索']) for(let i=0;i<4;i++) cards.push({v:8,s,i});
+function cardName(c){return c.v+c.s+(c.i+1)}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+// V5 keeps the full two-stage state machine. The physical split algorithm is isolated here so it can be replaced by the final small-yen dealing rule later.
+function splitThree(deck){const a=[],b=[],c=[]; deck.forEach((x,i)=>[a,b,c][i%3].push(x)); return [a,b,c]}
+function drawLine(){
+ let deck=cards.slice(); const fixed=deck.splice(Math.floor(Math.random()*deck.length),1)[0];
+ const [t1,r1,d1]=splitThree(shuffle(deck.slice())); const [t2,r2,d2]=splitThree(shuffle(r1.slice()));
+ const card=r2[Math.floor(Math.random()*r2.length)]; return {v:card.v,fixed};
+}
+function fullRun(){let fixed; let digits=''; for(let i=0;i<6;i++){const x=drawLine(); if(i===0)fixed=x.fixed; digits+=x.v} return {digits,fixed}}
+
+let session=null;
+const facebookIdInput=document.getElementById('facebookId');
+document.getElementById('startBtn').onclick=()=>{const q=document.getElementById('question').value.trim();const facebookId=facebookIdInput.value.trim();if(!q||!facebookId){alert('請填寫 Facebook ID 與問題');return}session={q,facebookId,lines:[],fixed:null,round:0};question.disabled=true;facebookIdInput.disabled=true;startBtn.disabled=true;formalArea.classList.remove('hidden');nextStepBtn.disabled=false;lockMsg.textContent='Facebook ID 與問題已鎖定，本卦完成前不修改。';lineGrid.innerHTML='';}
+document.getElementById('nextStepBtn').onclick=()=>{if(!session)return; const x=drawLine(); if(!session.fixed)session.fixed=x.fixed; session.round++; roundTitle.textContent=`第 ${session.round} 爻`; fixedCard.textContent=cardName(session.fixed); const sizes=[21,21,21]; tian1.textContent=sizes[0];ren1.textContent=sizes[1];di1.textContent=sizes[2];stepMsg.textContent='第一次取人 → 第二次取人 → 已抽出本爻';drawValue.textContent=x.v;session.lines.push(x.v);lineGrid.innerHTML=session.lines.map((v,i)=>`<div class="line"><div>第${i+1}爻</div><b>${v}</b></div>`).join(''); if(session.round===6){nextStepBtn.disabled=true;document.getElementById('sixDigits').value=session.lines.join('');document.getElementById('sixDigitResult').classList.remove('hidden');saveRecord();stepMsg.textContent='六爻完成，已保存正式紀錄。';}};
+document.getElementById('copySixDigitsBtn').onclick=async()=>{const digits=document.getElementById('sixDigits').value;if(!digits)return;try{if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(digits);}else{const temp=document.createElement('textarea');temp.value=digits;temp.setAttribute('readonly','');temp.style.position='fixed';temp.style.opacity='0';document.body.appendChild(temp);temp.select();const copied=document.execCommand('copy');temp.remove();if(!copied)throw new Error('copy failed');}document.getElementById('copySixDigitsStatus').textContent='六碼已複製';}catch(e){document.getElementById('copySixDigitsStatus').textContent='複製失敗，請手動選取六碼';}};
+function saveRecord(){const rec={id:Date.now().toString(36),time:new Date().toLocaleString('zh-TW'),facebookId:session.facebookId,question:session.q,fixed:cardName(session.fixed),digits:session.lines.join('')};let arr=JSON.parse(localStorage.getItem('xiaoyan_v5_records')||'[]');arr.unshift(rec);localStorage.setItem('xiaoyan_v5_records',JSON.stringify(arr));renderRecords();}
+function renderRecords(){const arr=JSON.parse(localStorage.getItem('xiaoyan_v5_records')||'[]');records.innerHTML=arr.length?arr.map(r=>`<div style="padding:10px 0;border-bottom:1px solid #e4ddd2"><b>${r.digits}</b>　${r.time}<br><span class="muted">Facebook ID：${escapeHtml(r.facebookId||'（舊紀錄未提供）')}｜問題：${escapeHtml(r.question)}｜固定牌：${escapeHtml(r.fixed||'')}｜ID：${escapeHtml(r.id||'')}</span></div>`).join(''):'尚無正式紀錄'}
+function escapeHtml(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+renderRecords();
+
+</script></body></html>
